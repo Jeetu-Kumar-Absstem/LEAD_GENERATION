@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lead Accelerator</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background: #0f172a;
+    color: white;
+    display: flex;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 220px;
+    background: #020617;
+    padding: 20px;
+}
+
+.sidebar h2 {
+    color: #22c55e;
+}
+
+.nav-item {
+    padding: 12px;
+    margin-top: 10px;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.nav-item:hover {
+    background: #1e293b;
+}
+
+/* Main */
+.main {
+    flex: 1;
+    padding: 40px;
+}
+
+/* Upload Card */
+.upload-card {
+    background: #020617;
+    border: 2px solid #22c55e;
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    max-width: 700px;
+    margin: auto;
+    transition: 0.3s;
+}
+
+.upload-card:hover {
+    box-shadow: 0 0 25px #22c55e;
+}
+
+/* Progress Bar Styling */
+.progress-container {
+    display: none; /* Hidden by default */
+    width: 100%;
+    background-color: #1e293b;
+    border-radius: 10px;
+    margin-top: 25px;
+    overflow: hidden;
+    height: 12px;
+    border: 1px solid #334155;
+}
+
+.progress-bar {
+    width: 0%;
+    height: 100%;
+    background-color: #22c55e;
+    box-shadow: 0 0 15px #22c55e;
+    transition: width 0.4s ease;
+}
+
+/* Indeterminate animation while waiting for backend */
+.progress-bar.active {
+    width: 100%;
+    animation: loading-bar 2s infinite ease-in-out;
+}
+
+@keyframes loading-bar {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(0%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Button */
+button {
+    background: #22c55e;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 20px;
+    color: black;
+    cursor: pointer;
+    margin: 5px;
+    font-weight: 600;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+button:disabled {
+    background: #475569;
+    cursor: not-allowed;
+}
+
+/* Loader */
+.loader {
+    display: none;
+    margin-top: 15px;
+    color: #22c55e;
+    font-weight: 600;
+}
+
+/* Status */
+#status {
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+/* Results Table */
+#results {
+    margin-top: 40px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th {
+    background: #22c55e;
+    color: black;
+}
+
+td, th {
+    padding: 10px;
+    border: 1px solid #1e293b;
+    text-align: center;
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+    <h2>🚀 LeadGen</h2>
+    <div class="nav-item">Dashboard</div>
+    <div class="nav-item">Process</div>
+    <div class="nav-item">Database</div>
+</div>
+
+<div class="main">
+    <h1>Lead Accelerator</h1>
+    <p>Upload your company list to extract emails via Hunter API</p>
+
+    <div class="upload-card" id="dropZone">
+        <h2>Upload CSV / Excel</h2>
+        <p>Drag & drop or click below to start processing</p>
+
+        <input type="file" id="fileInput" hidden accept=".csv,.xlsx,.xls">
+        <button id="uploadBtn" onclick="fileInput.click()">Choose File</button>
+        <button id="downloadBtn" onclick="downloadCSV()">⬇ Download CSV</button>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="loader" id="loader">⏳ API Extraction in Progress...</div>
+        <p id="status"></p>
+    </div>
+
+    <div id="results"></div>
+</div>
+
+<script>
+const fileInput = document.getElementById("fileInput");
+const status = document.getElementById("status");
+const loader = document.getElementById("loader");
+const progressContainer = document.getElementById("progressContainer");
+const progressBar = document.getElementById("progressBar");
+const uploadBtn = document.getElementById("uploadBtn");
+
+let currentBatchId = null;
+
+fileInput.addEventListener("change", () => {
+    if (fileInput.files.length > 0) {
+        uploadFile(fileInput.files[0]);
+    }
+});
+
+async function uploadFile(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // 1. Reset UI and show loading state
+    uploadBtn.disabled = true;
+    loader.style.display = "block";
+    progressContainer.style.display = "block";
+    progressBar.classList.add("active");
+    status.innerText = "Connecting to Hunter.io and processing rows...";
+    document.getElementById("results").innerHTML = "";
+
+    try {
+        // 2. Make Request to Backend
+        //const res=await fetch("http://localhost:8000/process", {
+          //  method: "POST",
+           // body: formData
+      //  });     
+         const res = await fetch("http://127.0.0.1:8000/process", {
+             method: "POST",
+             body: formData
+         });
+
+        if (!res.ok) throw new Error("Processing failed on server.");
+
+        const result = await res.json();
+
+        // 3. Update UI on Success
+        currentBatchId = result.batch_id;
+        progressBar.classList.remove("active");
+        progressBar.style.width = "100%"; // Show completed
+        
+        status.innerText = `✅ Success! ${result.data.length} leads generated using ${result.credits_used} credits.`;
+
+        displayResults(result.data);
+
+    } catch (error) {
+        console.error(error);
+        status.innerText = "❌ Error: " + error.message;
+        progressBar.style.backgroundColor = "#ef4444"; // Turn red on error
+        progressBar.classList.remove("active");
+    } finally {
+        loader.style.display = "none";
+        uploadBtn.disabled = false;
+    }
+}
+
+function displayResults(data) {
+    if (data.length === 0) return;
+
+    let html = `
+    <table>
+        <tr>
+            <th>Company</th>
+            <th>Domain</th>
+            <th>Email</th>
+            <th>Confidence</th>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Position</th>
+        </tr>`;
+
+    data.forEach(row => {
+        html += `
+        <tr>
+            <td>${row.company || "-"}</td>
+            <td>${row.domain || "-"}</td>
+            <td>${row.email || "-"}</td>
+            <td>${row.confidence ? row.confidence + '%' : "-"}</td>
+            <td>${row.first_name || "-"}</td>
+            <td>${row.last_name || "-"}</td>
+            <td>${row.position || "-"}</td>
+        </tr>`;
+    });
+
+    html += "</table>";
+    document.getElementById("results").innerHTML = html;
+}
+
+function downloadCSV() {
+    if (!currentBatchId) {
+        alert("⚠️ Please upload and process a file first");
+        return;
+    }
+    window.open(`http://127.0.0.1:8000/download/${currentBatchId}`, "_blank");
+}
+</script>
+
+</body>
+</html>
