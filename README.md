@@ -41,7 +41,7 @@ Create a `.env` file in the root directory and configure your credentials:
 
 ```env
 # Your Hunter API key
-HUNTER_API_KEY = "your_api_key_here"
+HUNTER_API_KEY="your_api_key_here"
 
 # Local Docker database URL
 DATABASE_URL="postgresql://postgres:password@db:5432/leadgen_db"
