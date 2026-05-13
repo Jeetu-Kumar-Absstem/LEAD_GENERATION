@@ -10,7 +10,7 @@ import time
 import random
 
 from database import SessionLocal, engine
-from models import Lead, Base
+from models import Lead, Base, InputFile, OutputFile
 from utils import extract_domain, flatten_emails
 
 from dotenv import load_dotenv
@@ -126,6 +126,45 @@ def get_emails(domain, retries=2):
 
 
 # ==============================
+# UPLOAD FILE AND STORE IN DB
+# ==============================
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        if not file:
+            return {"error": "No file uploaded"}
+
+        # Read file contents into memory
+        contents = await file.read()
+        
+        db = SessionLocal()
+        
+        # Store file in input_files table
+        input_file = InputFile(
+            original_filename=file.filename,
+            mime_type=file.content_type,
+            file_size=len(contents),
+            file_data=contents,
+            uploaded_by="default_user"
+        )
+        
+        db.add(input_file)
+        db.commit()
+        db.refresh(input_file)
+        db.close()
+        
+        return {
+            "success": True,
+            "inputFileId": input_file.id,
+            "filename": file.filename,
+            "file_size": len(contents)
+        }
+    except Exception as e:
+        print(f"❌ Upload error: {e}")
+        return {"error": str(e)}
+
+
+# ==============================
 # PROCESS FILE
 # ==============================
 @app.post("/process")
@@ -152,6 +191,21 @@ async def process_file(file: UploadFile = File(...)):
 
     contents = await file.read()
 
+    # Save uploaded input file to database so Inputs tab shows it
+    db = SessionLocal()
+    input_file = InputFile(
+        original_filename=file.filename,
+        mime_type=file.content_type,
+        file_size=len(contents),
+        file_data=contents,
+        uploaded_by="default_user",
+        status="uploaded"
+    )
+    db.add(input_file)
+    db.commit()
+    db.refresh(input_file)
+    input_file_id = input_file.id
+
     if file.filename.endswith(".csv"):
         df = pd.read_csv(io.BytesIO(contents))
     else:
@@ -160,7 +214,6 @@ async def process_file(file: UploadFile = File(...)):
     df.columns = df.columns.str.strip().str.lower()
 
     final_data = []
-    db = SessionLocal()
     domain_cache = {}
 
     for _, row in df.iterrows():
@@ -242,14 +295,130 @@ async def process_file(file: UploadFile = File(...)):
             print("⚠️ Row Error:", e)
 
     db.commit()
+    
+    # ==============================
+    # SAVE OUTPUT FILE TO DATABASE
+    # ==============================
+    # Generate CSV content in memory
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    
+    writer.writerow([
+        "Company", "Domain", "Email", "Confidence",
+        "First Name", "Last Name", "Position"
+    ])
+    
+    for lead in final_data:
+        writer.writerow([
+            lead.get("company"),
+            lead.get("domain"),
+            lead.get("email"),
+            lead.get("confidence"),
+            lead.get("first_name"),
+            lead.get("last_name"),
+            lead.get("position")
+        ])
+    
+    csv_content = csv_buffer.getvalue()
+    csv_bytes = csv_content.encode('utf-8')
+    
+    # Store output file in database
+    output_filename = f"leadgen_output_{batch_id}.csv"
+    output_file = OutputFile(
+        input_file_id=input_file_id,
+        original_filename=output_filename,
+        mime_type="text/csv",
+        file_size=len(csv_bytes),
+        file_data=csv_bytes,
+        records_generated=len(final_data),
+        status="generated"
+    )
+    
+    db.add(output_file)
+    db.commit()
+    db.refresh(output_file)
     db.close()
 
     return {
         "message": "Processed successfully",
         "batch_id": batch_id,
+        "outputFileId": output_file.id,
         "credits_used": call_count,
         "data": final_data
     }
+
+
+# ==============================
+# DATA ENDPOINTS - LIST FILES
+# ==============================
+@app.get("/data/inputs")
+def list_input_files():
+    """List all uploaded input files"""
+    db = SessionLocal()
+    files = db.query(InputFile).order_by(InputFile.uploaded_at.desc()).all()
+    db.close()
+    
+    return [{
+        "id": f.id,
+        "original_filename": f.original_filename,
+        "file_size": f.file_size,
+        "uploaded_at": f.uploaded_at.isoformat() if f.uploaded_at else None,
+        "status": f.status
+    } for f in files]
+
+
+@app.get("/data/outputs")
+def list_output_files():
+    """List all generated output files"""
+    db = SessionLocal()
+    files = db.query(OutputFile).order_by(OutputFile.created_at.desc()).all()
+    db.close()
+    
+    return [{
+        "id": f.id,
+        "original_filename": f.original_filename,
+        "file_size": f.file_size,
+        "created_at": f.created_at.isoformat() if f.created_at else None,
+        "records_generated": f.records_generated,
+        "status": f.status
+    } for f in files]
+
+
+# ==============================
+# DATA ENDPOINTS - DOWNLOAD FILES
+# ==============================
+@app.get("/data/inputs/{file_id}/download")
+def download_input_file(file_id: int):
+    """Download an uploaded input file from database"""
+    db = SessionLocal()
+    file = db.query(InputFile).filter(InputFile.id == file_id).first()
+    db.close()
+    
+    if not file:
+        return {"error": "File not found"}
+    
+    return StreamingResponse(
+        io.BytesIO(file.file_data),
+        media_type=file.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename={file.original_filename}"}
+    )
+
+
+@app.get("/data/outputs/{file_id}/download")
+def download_output_file(file_id: int):
+    """Download a generated output file from database"""
+    db = SessionLocal()
+    file = db.query(OutputFile).filter(OutputFile.id == file_id).first()
+    db.close()
+    
+    if not file:
+        return {"error": "File not found"}
+    
+    return StreamingResponse(
+        io.BytesIO(file.file_data),
+        media_type=file.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename={file.original_filename}"}
+    )
 
 
 # ==============================

@@ -32,16 +32,33 @@ body {
     margin-top: 10px;
     cursor: pointer;
     border-radius: 8px;
+    transition: 0.3s;
 }
 
 .nav-item:hover {
     background: #1e293b;
 }
 
+.nav-item.active {
+    background: #22c55e;
+    color: black;
+    font-weight: 600;
+}
+
 /* Main */
 .main {
     flex: 1;
     padding: 40px;
+    overflow-y: auto;
+}
+
+/* Sections */
+.section {
+    display: none;
+}
+
+.section.active {
+    display: block;
 }
 
 /* Upload Card */
@@ -62,7 +79,7 @@ body {
 
 /* Progress Bar Styling */
 .progress-container {
-    display: none; /* Hidden by default */
+    display: none;
     width: 100%;
     background-color: #1e293b;
     border-radius: 10px;
@@ -80,7 +97,6 @@ body {
     transition: width 0.4s ease;
 }
 
-/* Indeterminate animation while waiting for backend */
 .progress-bar.active {
     width: 100%;
     animation: loading-bar 2s infinite ease-in-out;
@@ -102,6 +118,16 @@ button {
     cursor: pointer;
     margin: 5px;
     font-weight: 600;
+    transition: 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+button img.tab-icon,
+button img.icon {
+    width: 18px;
+    height: 18px;
 }
 
 button:hover {
@@ -132,6 +158,100 @@ button:disabled {
     margin-top: 40px;
 }
 
+/* Data Management */
+.data-management {
+    background: #020617;
+    border: 2px solid #22c55e;
+    border-radius: 20px;
+    padding: 30px;
+    margin-top: 40px;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    background: #1e293b;
+    color: white;
+    border: 1px solid #334155;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.tab-button.active {
+    background: #22c55e;
+    color: black;
+    font-weight: 600;
+}
+
+.tab-button:hover {
+    background: #334155;
+}
+
+.tab-button.active:hover {
+    background: #22c55e;
+    opacity: 1;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Files Table */
+.files-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.files-table th,
+.files-table td {
+    padding: 12px;
+    border: 1px solid #1e293b;
+    text-align: left;
+}
+
+.files-table th {
+    background: #22c55e;
+    color: black;
+    font-weight: 600;
+}
+
+.files-table tr:hover {
+    background: #1e293b;
+}
+
+.files-table td.actions {
+    text-align: center;
+}
+
+.download-btn {
+    background: #3b82f6;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.download-btn:hover {
+    background: #2563eb;
+}
+
+.empty-message {
+    text-align: center;
+    color: #94a3b8;
+    padding: 40px 20px;
+    font-size: 1.1rem;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
@@ -155,44 +275,140 @@ td, th {
 
 <div class="sidebar">
     <h2>🚀 LeadGen</h2>
-    <div class="nav-item">Dashboard</div>
-    <div class="nav-item">Process</div>
-    <div class="nav-item">Database</div>
+    <div class="nav-item active" onclick="switchSection('dashboard')">Dashboard</div>
+    <div class="nav-item" onclick="switchSection('process')">Process</div>
+    <div class="nav-item" onclick="switchSection('data')">Data</div>
 </div>
 
 <div class="main">
-    <h1>Lead Accelerator</h1>
-    <p>Upload your company list to extract emails via Hunter API</p>
+    <!-- Dashboard Section -->
+    <div id="dashboard" class="section active">
+        <h1>Lead Accelerator</h1>
+        <p>Upload your company list to extract emails via Hunter API</p>
 
-    <div class="upload-card" id="dropZone">
-        <h2>Upload CSV / Excel</h2>
-        <p>Drag & drop or click below to start processing</p>
+        <div class="upload-card" id="dropZone">
+            <h2>Upload CSV / Excel</h2>
+            <p>Drag & drop or click below to start processing</p>
 
-        <input type="file" id="fileInput" hidden accept=".csv,.xlsx,.xls">
-        <button id="uploadBtn" onclick="fileInput.click()">Choose File</button>
-        <button id="downloadBtn" onclick="downloadCSV()">⬇ Download CSV</button>
+            <input type="file" id="fileInput" hidden accept=".csv,.xlsx,.xls">
+            <button id="uploadBtn" onclick="fileInput.click()">Choose File</button>
+            <button id="downloadBtn" onclick="downloadCSV()">⬇ Download CSV</button>
 
-        <div class="progress-container" id="progressContainer">
-            <div class="progress-bar" id="progressBar"></div>
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+
+            <div class="loader" id="loader">⏳ API Extraction in Progress...</div>
+            <p id="status"></p>
         </div>
 
-        <div class="loader" id="loader">⏳ API Extraction in Progress...</div>
-        <p id="status"></p>
+        <div id="results"></div>
     </div>
 
-    <div id="results"></div>
+    <!-- Process Section -->
+    <div id="process" class="section">
+        <h1>Process</h1>
+        <p>Upload files to process and generate leads</p>
+
+        <div class="upload-card">
+            <h2>Upload File</h2>
+            <p>Select a CSV or Excel file to process</p>
+
+            <input type="file" id="fileInputProcess" hidden accept=".csv,.xlsx,.xls">
+            <button onclick="document.getElementById('fileInputProcess').click()">Choose File</button>
+
+            <div class="progress-container" id="progressContainerProcess">
+                <div class="progress-bar" id="progressBarProcess"></div>
+            </div>
+
+            <div class="loader" id="loaderProcess">⏳ Processing...</div>
+            <p id="statusProcess"></p>
+        </div>
+    </div>
+
+    <!-- Data Section -->
+    <div id="data" class="section">
+        <h1>Data Repository</h1>
+        <p>View and download your uploaded and generated files</p>
+
+        <div class="data-management">
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('inputs')">
+                    <img class="tab-icon" src="images/upload.png" alt="Upload"> Inputs
+                </button>
+                <button class="tab-button" onclick="switchTab('outputs')">
+                    <img class="tab-icon" src="images/download.png" alt="Download"> Outputs
+                </button>
+            </div>
+
+            <!-- Inputs Tab -->
+            <div id="inputs" class="tab-content active">
+                <h3>Uploaded Files</h3>
+                <div id="inputsList"></div>
+            </div>
+
+            <!-- Outputs Tab -->
+            <div id="outputs" class="tab-content">
+                <h3>Generated Files</h3>
+                <div id="outputsList"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
 const fileInput = document.getElementById("fileInput");
+const fileInputProcess = document.getElementById("fileInputProcess");
 const status = document.getElementById("status");
+const statusProcess = document.getElementById("statusProcess");
 const loader = document.getElementById("loader");
+const loaderProcess = document.getElementById("loaderProcess");
 const progressContainer = document.getElementById("progressContainer");
+const progressContainerProcess = document.getElementById("progressContainerProcess");
 const progressBar = document.getElementById("progressBar");
+const progressBarProcess = document.getElementById("progressBarProcess");
 const uploadBtn = document.getElementById("uploadBtn");
 
 let currentBatchId = null;
+let currentOutputFileId = null;
 
+// ==============================
+// SECTION NAVIGATION
+// ==============================
+function switchSection(sectionId) {
+    // Hide all sections
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    // Show selected section
+    document.getElementById(sectionId).classList.add('active');
+    
+    // Update nav items
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Load data if switching to data section
+    if (sectionId === 'data') {
+        loadInputFiles();
+        loadOutputFiles();
+    }
+}
+
+// ==============================
+// TAB NAVIGATION (Data Section)
+// ==============================
+function switchTab(tabId) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    // Show selected tab
+    document.getElementById(tabId).classList.add('active');
+    
+    // Update tab buttons
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+// ==============================
+// FILE UPLOAD (Dashboard)
+// ==============================
 fileInput.addEventListener("change", () => {
     if (fileInput.files.length > 0) {
         uploadFile(fileInput.files[0]);
@@ -203,7 +419,6 @@ async function uploadFile(file) {
     const formData = new FormData();
     formData.append("file", file);
 
-    // 1. Reset UI and show loading state
     uploadBtn.disabled = true;
     loader.style.display = "block";
     progressContainer.style.display = "block";
@@ -212,24 +427,19 @@ async function uploadFile(file) {
     document.getElementById("results").innerHTML = "";
 
     try {
-        // 2. Make Request to Backend
-        //const res=await fetch("http://localhost:8000/process", {
-          //  method: "POST",
-           // body: formData
-      //  });     
-         const res = await fetch("http://127.0.0.1:8000/process", {
-             method: "POST",
-             body: formData
-         });
+        const res = await fetch("http://127.0.0.1:8000/process", {
+            method: "POST",
+            body: formData
+        });
 
         if (!res.ok) throw new Error("Processing failed on server.");
 
         const result = await res.json();
 
-        // 3. Update UI on Success
         currentBatchId = result.batch_id;
+        currentOutputFileId = result.outputFileId;
         progressBar.classList.remove("active");
-        progressBar.style.width = "100%"; // Show completed
+        progressBar.style.width = "100%";
         
         status.innerText = `✅ Success! ${result.data.length} leads generated using ${result.credits_used} credits.`;
 
@@ -238,7 +448,7 @@ async function uploadFile(file) {
     } catch (error) {
         console.error(error);
         status.innerText = "❌ Error: " + error.message;
-        progressBar.style.backgroundColor = "#ef4444"; // Turn red on error
+        progressBar.style.backgroundColor = "#ef4444";
         progressBar.classList.remove("active");
     } finally {
         loader.style.display = "none";
@@ -279,11 +489,122 @@ function displayResults(data) {
 }
 
 function downloadCSV() {
-    if (!currentBatchId) {
+    if (!currentOutputFileId) {
         alert("⚠️ Please upload and process a file first");
         return;
     }
-    window.open(`http://127.0.0.1:8000/download/${currentBatchId}`, "_blank");
+    window.open(`http://127.0.0.1:8000/data/outputs/${currentOutputFileId}/download`, "_blank");
+}
+
+// ==============================
+// DATA MANAGEMENT - LOAD FILES
+// ==============================
+async function loadInputFiles() {
+    try {
+        const res = await fetch("http://127.0.0.1:8000/data/inputs");
+        const files = await res.json();
+        
+        let html = '';
+        
+        if (files.length === 0) {
+            html = '<div class="empty-message">No uploaded files yet</div>';
+        } else {
+            html = `
+            <table class="files-table">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Size</th>
+                        <th>Uploaded</th>
+                        <th>Status</th>
+                        <th class="actions">Action</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            files.forEach(file => {
+                const sizeKB = (file.file_size / 1024).toFixed(2);
+                const date = new Date(file.uploaded_at).toLocaleString();
+                
+                html += `
+                <tr>
+                    <td>${file.original_filename}</td>
+                    <td>${sizeKB} KB</td>
+                    <td>${date}</td>
+                    <td>${file.status}</td>
+                    <td class="actions">
+                        <button class="download-btn" onclick="downloadInputFile(${file.id})">📥 Download</button>
+                    </td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+        }
+        
+        document.getElementById('inputsList').innerHTML = html;
+    } catch (error) {
+        console.error('Error loading input files:', error);
+        document.getElementById('inputsList').innerHTML = '<div class="empty-message">Error loading files</div>';
+    }
+}
+
+async function loadOutputFiles() {
+    try {
+        const res = await fetch("http://127.0.0.1:8000/data/outputs");
+        const files = await res.json();
+        
+        let html = '';
+        
+        if (files.length === 0) {
+            html = '<div class="empty-message">No generated files yet</div>';
+        } else {
+            html = `
+            <table class="files-table">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Records</th>
+                        <th>Size</th>
+                        <th>Generated</th>
+                        <th>Status</th>
+                        <th class="actions">Action</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            files.forEach(file => {
+                const sizeKB = (file.file_size / 1024).toFixed(2);
+                const date = new Date(file.created_at).toLocaleString();
+                
+                html += `
+                <tr>
+                    <td>${file.original_filename}</td>
+                    <td>${file.records_generated}</td>
+                    <td>${sizeKB} KB</td>
+                    <td>${date}</td>
+                    <td>${file.status}</td>
+                    <td class="actions">
+                        <button class="download-btn" onclick="downloadOutputFile(${file.id})">📤 Download</button>
+                    </td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+        }
+        
+        document.getElementById('outputsList').innerHTML = html;
+    } catch (error) {
+        console.error('Error loading output files:', error);
+        document.getElementById('outputsList').innerHTML = '<div class="empty-message">Error loading files</div>';
+    }
+}
+
+function downloadInputFile(fileId) {
+    window.open(`http://127.0.0.1:8000/data/inputs/${fileId}/download`, "_blank");
+}
+
+function downloadOutputFile(fileId) {
+    window.open(`http://127.0.0.1:8000/data/outputs/${fileId}/download`, "_blank");
 }
 </script>
 
